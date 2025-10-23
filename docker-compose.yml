@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./certs:/etc/ssl/traefik:ro
+      - ./logs:/var/log/traefik
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.local.test`)"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.service=api@internal"
+
+  # Sample web application
+  whoami:
+    image: traefik/whoami:v1.8
+    container_name: whoami
+    restart: unless-stopped
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.local.test`)"
+      - "traefik.http.routers.whoami.tls=true"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+
+  # Sample nginx application
+  nginx-app:
+    image: nginx:alpine
+    container_name: nginx-app
+    restart: unless-stopped
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx-app.rule=Host(`app.local.test`)"
+      - "traefik.http.routers.nginx-app.tls=true"
+      - "traefik.http.services.nginx-app.loadbalancer.server.port=80"
+
+networks:
+  traefik:
+    external: false
+    name: traefik
